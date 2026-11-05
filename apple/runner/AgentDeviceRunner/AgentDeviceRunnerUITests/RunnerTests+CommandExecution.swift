@@ -339,6 +339,7 @@ extension RunnerTests {
             durationMs: defaults.durationMs,
             message: "scrolled",
             context: scrollContext,
+            keyboardFrame: gesture.keyboardFrame,
             releaseBehavior: command.scrollReleaseBehavior
           )
         )

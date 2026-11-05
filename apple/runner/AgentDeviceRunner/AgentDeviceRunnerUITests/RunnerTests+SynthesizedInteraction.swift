@@ -198,11 +198,19 @@ extension RunnerTests {
     x: Double,
     y: Double,
     x2: Double,
-    y2: Double
+    y2: Double,
+    keyboard: DragKeyboardRead = .live
   ) throws -> DragPoints {
     let original = DragPoints(x: x, y: y, x2: x2, y2: y2)
 #if os(iOS)
-    guard let keyboardFrame = visibleKeyboardFrame(app: app) else {
+    let observedKeyboardFrame: CGRect?
+    switch keyboard {
+    case .live:
+      observedKeyboardFrame = visibleKeyboardFrame(app: app)
+    case .alreadyRead(let frame):
+      observedKeyboardFrame = frame
+    }
+    guard let keyboardFrame = observedKeyboardFrame else {
       return original
     }
     let minX = min(x, x2)
@@ -359,7 +367,8 @@ extension RunnerTests {
     y: Double,
     x2: Double,
     y2: Double,
-    context: SynthesizedCoordinateContext? = nil
+    context: SynthesizedCoordinateContext? = nil,
+    keyboard: DragKeyboardRead
   ) throws -> SynthesizedDragPlan? {
 #if os(iOS)
     let context = try context ?? synthesizedCoordinateContext(app: app)
@@ -369,7 +378,7 @@ extension RunnerTests {
       return nil
     }
     let points = context.allowsKeyboardProbe
-      ? try keyboardAvoidingDragPoints(app: app, x: x, y: y, x2: x2, y2: y2)
+      ? try keyboardAvoidingDragPoints(app: app, x: x, y: y, x2: x2, y2: y2, keyboard: keyboard)
       : DragPoints(x: x, y: y, x2: x2, y2: y2)
     return SynthesizedDragPlan(
       points: points,

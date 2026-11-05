@@ -48,6 +48,7 @@ private final class LitPanelBookingProbe: NSObject {
   static var applicationFrame: CGRect?
   static var keyboard: XCUIElement?
   static var keyboardFrame: CGRect?
+  static var keyboardProbes = 0
   static var targetFrame = CGRect(x: 190, y: 140, width: 20, height: 20)
   static var windowDisplayID: UInt = 3
   static var includeDarkSelector = true
@@ -85,7 +86,11 @@ private final class LitPanelBookingProbe: NSObject {
     }
   }
 
-  @objc var exists: Bool { self !== Self.keyboard || Self.keyboardFrame != nil }
+  @objc var exists: Bool {
+    guard self === Self.keyboard else { return true }
+    Self.keyboardProbes += 1
+    return Self.keyboardFrame != nil
+  }
   @objc var isHittable: Bool { true }
   @objc var elementType: UInt { XCUIElement.ElementType.button.rawValue }
   @objc var label: String { "same-selector" }
@@ -329,6 +334,40 @@ extension RunnerTests {
         XCTAssertEqual(dispatch.orientation, RunnerInterfaceOrientation.landscapeRight)
         XCTAssertEqual(dispatch.start, CGPoint(x: 235, y: 335))
         XCTAssertEqual(dispatch.end, CGPoint(x: 435, y: 335))
+      }
+    }
+  }
+
+  /// A scroll probes the keyboard once: its drag avoids the frame its viewport was cut against. A
+  /// floating keyboard beside the centre line leaves the band whole, and the drag still lifts off it.
+  @MainActor
+  func testScrollProbesTheKeyboardOnceAndItsDragAvoidsThatFrame() throws {
+    let health = mainOwned.accessibilityHealth
+    defer { mainOwned.accessibilityHealth = health }
+    try withLitPanelBookingProbe(composed: true) { _ in
+      LitPanelBookingProbe.orientation = RunnerInterfaceOrientation.portrait
+      let phone = CGRect(x: 0, y: 0, width: 402, height: 874)
+      let docked = CGRect(x: 0, y: 538, width: 402, height: 336)
+      let tablet = CGRect(x: 0, y: 0, width: 834, height: 1194)
+      let floating = CGRect(x: 20, y: 500, width: 320, height: 260)
+      let cases: [(name: String, window: CGRect, keyboard: CGRect?, health: RunnerAccessibilityHealth,
+                   direction: String, probes: Int, keyboardMinY: Double?, y: Double)] = [
+        ("docked keyboard", phone, docked, .healthy, "down", 1, 538, 434),
+        ("floating keyboard", tablet, floating, .healthy, "left", 1, nil, 488),
+        ("no keyboard, unknown health", phone, nil, .unknown, "down", 1, nil, 721),
+        ("unavailable health", phone, docked, .unavailable, "down", 0, nil, 721),
+      ]
+      for testCase in cases {
+        mainOwned.accessibilityHealth = testCase.health
+        LitPanelBookingProbe.windowFrame = testCase.window
+        LitPanelBookingProbe.keyboardFrame = testCase.keyboard
+        LitPanelBookingProbe.keyboardProbes = 0
+        let command = try runnerCommandFixture(#"{"command":"scroll","direction":"\#(testCase.direction)"}"#)
+        try withPreparedSurfaceCommand(command) { response in
+          XCTAssertEqual(LitPanelBookingProbe.keyboardProbes, testCase.probes, testCase.name)
+          XCTAssertEqual(response.data?.keyboardMinY, testCase.keyboardMinY, testCase.name)
+          XCTAssertEqual(response.data?.y, testCase.y, testCase.name)
+        }
       }
     }
   }

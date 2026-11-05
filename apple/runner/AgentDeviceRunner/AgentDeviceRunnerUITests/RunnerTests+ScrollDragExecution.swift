@@ -37,6 +37,7 @@ extension RunnerTests {
     durationMs: Double,
     message: String,
     context: SynthesizedCoordinateContext,
+    keyboardFrame: CGRect?,
     releaseBehavior: ScrollReleaseBehavior?
   ) throws -> Response {
 #if os(iOS)
@@ -49,6 +50,7 @@ extension RunnerTests {
       durationMs: durationMs,
       message: message,
       synthesizedContext: context,
+      synthesizedKeyboard: .alreadyRead(keyboardFrame),
       synthesized: (profile: scrollDragProfile(releaseBehavior: releaseBehavior), policyKind: .scroll)
     )
 #else
@@ -66,6 +68,7 @@ extension RunnerTests {
 
   /// Shared coordinate drag execution. Callers that pass `synthesized` take the iOS synthesized
   /// lane with that profile and fallback policy; the rest perform an XCTest coordinate drag.
+  /// `synthesizedKeyboard` is where the synthesized lane reads the keyboard it avoids.
   @MainActor
   func executeDragGesture(
     activeApp: XCUIApplication,
@@ -76,6 +79,7 @@ extension RunnerTests {
     durationMs: Double?,
     message: String,
     synthesizedContext: SynthesizedCoordinateContext? = nil,
+    synthesizedKeyboard: DragKeyboardRead = .live,
     synthesized: (profile: SynthesizedDragProfile, policyKind: SynthesizedGesturePolicyKind)? = nil
   ) throws -> Response {
     let durationMs = durationMs ?? runnerDefaultDragDurationMs
@@ -95,6 +99,7 @@ extension RunnerTests {
       durationMs: durationMs,
       message: message,
       context: synthesizedContext,
+      keyboard: synthesizedKeyboard,
       policyKind: synthesized.policyKind,
       profile: synthesized.profile
     ) {
@@ -159,6 +164,7 @@ extension RunnerTests {
     durationMs: Double,
     message: String,
     context: SynthesizedCoordinateContext?,
+    keyboard: DragKeyboardRead,
     policyKind: SynthesizedGesturePolicyKind,
     profile: SynthesizedDragProfile
   ) throws -> Response? {
@@ -170,7 +176,8 @@ extension RunnerTests {
       y: y,
       x2: x2,
       y2: y2,
-      context: context
+      context: context,
+      keyboard: keyboard
     )
     else {
       logSynthesizedGesturePolicyDecision(kind: policyKind, context: context, fallbackAttempted: false)

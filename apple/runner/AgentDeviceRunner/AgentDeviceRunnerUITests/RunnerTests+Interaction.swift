@@ -71,6 +71,14 @@ extension RunnerTests {
     let y2: Double
   }
 
+  /// Where a drag reads the keyboard it steers clear of. `live` probes the keyboard while the drag is
+  /// planned. `alreadyRead` is the frame the command already probed for the surface the drag was
+  /// planned on, nil when that probe found none, so one command does not probe the keyboard twice.
+  enum DragKeyboardRead {
+    case live
+    case alreadyRead(CGRect?)
+  }
+
   struct SynthesizedDragPlan {
     let points: DragPoints
     let context: SynthesizedCoordinateContext

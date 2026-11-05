@@ -82,6 +82,37 @@ extension RunnerTests {
     XCTAssertEqual(constants.accessoryAllowance, ScrollViewportPolicy.accessoryAllowance)
   }
 
+  /// The swipe hands its drag the keyboard frame the clip was decided on, so the drag avoids that
+  /// frame without probing the keyboard again; an occluded viewport dispatches nothing.
+  func testScrollDispatchCarriesTheKeyboardFrameItsViewportWasResolvedAgainst() {
+    let viewport = CGRect(x: 0, y: 0, width: 402, height: 874)
+    let docked = CGRect(x: 0, y: 538, width: 402, height: 336)
+    let cases: [(clip: RunnerScrollKeyboardClip, keyboardFrame: CGRect?)] = [
+      (.unobstructed, nil),
+      (.unobstructed, CGRect(x: 20, y: 500, width: 120, height: 200)),
+      (.avoided(frame: CGRect(x: 0, y: 0, width: 402, height: 526), keyboardMinY: 538), docked),
+    ]
+    for testCase in cases {
+      let resolved = ScrollViewportPolicy.frames(
+        referenceFrame: viewport,
+        clip: testCase.clip,
+        keyboardFrame: testCase.keyboardFrame
+      )
+      guard case .gesture(let dispatch) = resolved.gestureDispatch(direction: .down, amount: nil, pixels: nil) else {
+        return XCTFail("\(testCase.clip) dispatches no gesture")
+      }
+      XCTAssertEqual(dispatch.keyboardFrame, testCase.keyboardFrame, "\(testCase.clip)")
+    }
+    let occluded = ScrollViewportPolicy.frames(
+      referenceFrame: viewport,
+      clip: .occluded(keyboardMinY: 120, visibleHeight: 108),
+      keyboardFrame: docked
+    )
+    guard case .occluded = occluded.gestureDispatch(direction: .down, amount: nil, pixels: nil) else {
+      return XCTFail("an occluded viewport dispatches a gesture")
+    }
+  }
+
   private func loadScrollViewportPolicyFixture() throws -> ScrollViewportPolicyFixture {
     let fixtureURL = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent() // UnitTests
